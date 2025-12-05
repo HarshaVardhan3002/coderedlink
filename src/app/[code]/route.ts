@@ -15,14 +15,24 @@ export async function GET(
       return NextResponse.redirect(new URL("/404", req.url))
     }
 
-    // Async update stats (fire and forget)
+    // Extract IP and user agent for analytics
+    const forwardedFor = req.headers.get("x-forwarded-for")
+    const ipAddress = forwardedFor ? forwardedFor.split(",")[0].trim() : req.headers.get("x-real-ip") || "unknown"
+    const userAgent = req.headers.get("user-agent") || "unknown"
+    const referer = req.headers.get("referer") || null
+
+    // Update stats and create click record with IP tracking
     prisma.link.update({
       where: { id: link.id },
       data: {
         totalClicks: { increment: 1 },
         lastClickedAt: new Date(),
         clicks: {
-          create: {}
+          create: {
+            ipAddress,
+            userAgent,
+            referer,
+          }
         }
       },
     }).catch(console.error)

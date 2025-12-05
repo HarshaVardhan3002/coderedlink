@@ -1,2 +1,0 @@
-src/app/[code]/route.ts(24,9): error TS2353: Object literal may only specify known properties, and 'clicks' does not exist in type '(Without<LinkUpdateInput, LinkUncheckedUpdateInput> & LinkUncheckedUpdateInput) | (Without<...> & LinkUpdateInput)'.
-src/app/api/links/[code]/route.ts(12,7): error TS2322: Type '{ clicks: { orderBy: { createdAt: string; }; }; }' is not assignable to type 'never'.

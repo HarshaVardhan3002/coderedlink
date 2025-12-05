@@ -1,30 +1,26 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useState, useEffect, use } from "react"
+import Link from "next/link"
 import { motion } from "framer-motion"
+import { 
+  ArrowLeft, Copy, Check, ExternalLink, RefreshCw, 
+  MousePointer2, Clock, Globe, TrendingUp
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Copy, ExternalLink, Clock, MousePointer2, Share2, Activity, Globe, Facebook, Twitter, Linkedin, Send } from "lucide-react"
+import { Navbar } from "@/components/Navbar"
 import { toast } from "sonner"
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer
 } from "recharts"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 
-type ClickData = {
+type Click = {
   id: string
+  ipAddress: string | null
+  userAgent: string | null
+  referer: string | null
   createdAt: string
 }
 
@@ -35,297 +31,297 @@ type LinkData = {
   totalClicks: number
   lastClickedAt: string | null
   createdAt: string
-  clicks: ClickData[]
+  clicks: Click[]
 }
 
-export default function StatsPage() {
-  const params = useParams()
-  const router = useRouter()
-  const code = params.code as string
+export default function StatsPage({ params }: { params: Promise<{ code: string }> }) {
+  const { code } = use(params)
   const [link, setLink] = useState<LinkData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
 
-  useEffect(() => {
-    if (code) fetchLink()
-  }, [code])
-
-  const fetchLink = async () => {
+  const fetchLinkData = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true)
     try {
       const res = await fetch(`/api/links/${code}`)
-      if (!res.ok) {
-        if (res.status === 404) router.push("/404")
-        return
+      if (res.ok) {
+        const data = await res.json()
+        setLink(data)
+        setLastUpdate(new Date())
+        setError(null)
+      } else if (res.status === 404) {
+        setError("Link not found")
+      } else {
+        setError("Failed to load link data")
       }
-      const data = await res.json()
-      setLink(data)
-    } catch (error) {
-      toast.error("Failed to fetch stats")
+    } catch (err) {
+      setError("Network error")
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
+
+  useEffect(() => {
+    fetchLinkData()
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => fetchLinkData(true), 30000)
+    return () => clearInterval(interval)
+  }, [code])
 
   const copyToClipboard = () => {
     const url = `${window.location.origin}/${code}`
     navigator.clipboard.writeText(url)
-    toast.success("Copied to clipboard!")
+    setCopied(true)
+    toast.success("Link copied!")
+    setTimeout(() => setCopied(false), 2000)
   }
 
-  const shareLink = (platform: string) => {
-    const url = `${window.location.origin}/${code}`
-    let shareUrl = ""
+  // Process click data for chart
+  const getChartData = () => {
+    if (!link?.clicks) return []
+    const clicksByDay: Record<string, number> = {}
+    
+    link.clicks.forEach(click => {
+      const date = new Date(click.createdAt).toLocaleDateString()
+      clicksByDay[date] = (clicksByDay[date] || 0) + 1
+    })
 
-    switch (platform) {
-      case "facebook":
-        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`
-        break
-      case "whatsapp":
-        shareUrl = `https://wa.me/?text=${encodeURIComponent(url)}`
-        break
-      case "telegram":
-        shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}`
-        break
-      case "discord":
-        navigator.clipboard.writeText(url)
-        toast.success("Link copied! Paste it in Discord.")
-        return
-    }
-
-    if (shareUrl) {
-      window.open(shareUrl, "_blank", "noopener,noreferrer")
-    }
+    return Object.entries(clicksByDay)
+      .map(([date, clicks]) => ({ date, clicks }))
+      .slice(-7) // Last 7 days
   }
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="relative">
-        <div className="w-16 h-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin shadow-[0_0_30px_rgba(var(--primary),0.2)]" />
-      </div>
-    </div>
-  )
-  
-  if (!link) return null
-
-  // Process real data for visualization
-  const processData = () => {
-    if (!link.clicks || link.clicks.length === 0) return []
-
-    // Group clicks by date
-    const clicksByDate = link.clicks.reduce((acc, click) => {
-      const date = new Date(click.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-      acc[date] = (acc[date] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-
-    // Create array for chart
-    const data = Object.entries(clicksByDate).map(([name, clicks]) => ({
-      name,
-      clicks
-    }))
-
-    // Sort by date (simple string sort might not be perfect for all locales but works for 'MMM D')
-    // Ideally we'd sort by timestamp, but for this demo:
-    return data
+  if (loading) {
+    return (
+      <main className="min-h-screen">
+        <Navbar />
+        <div className="pt-28 px-4">
+          <div className="max-w-4xl mx-auto">
+            <div className="animate-pulse space-y-6">
+              <div className="h-8 w-48 bg-muted rounded" />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="glass rounded-2xl h-28" />
+                ))}
+              </div>
+              <div className="glass rounded-2xl h-64" />
+            </div>
+          </div>
+        </div>
+      </main>
+    )
   }
 
-  const chartData = processData()
+  if (error || !link) {
+    return (
+      <main className="min-h-screen">
+        <Navbar />
+        <div className="pt-28 px-4">
+          <div className="max-w-xl mx-auto text-center">
+            <Card className="glass border-0">
+              <CardContent className="py-16">
+                <h2 className="text-2xl font-bold mb-2">Link Not Found</h2>
+                <p className="text-muted-foreground mb-6">{error}</p>
+                <Link href="/">
+                  <Button className="rounded-xl">
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back to Home
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  const chartData = getChartData()
+  const uniqueIPs = new Set(link.clicks.map(c => c.ipAddress).filter(Boolean)).size
 
   return (
-    <main className="min-h-screen p-4 md:p-12 space-y-8 relative overflow-hidden font-sans bg-background text-foreground">
-      {/* Background Orbs - Soft & Diffused */}
-      <div className="fixed top-[-20%] right-[-10%] w-[800px] h-[800px] bg-primary/10 rounded-full blur-[120px] animate-blob mix-blend-screen pointer-events-none" />
-      <div className="fixed bottom-[-20%] left-[-10%] w-[600px] h-[600px] bg-secondary/10 rounded-full blur-[100px] animate-blob animation-delay-2000 mix-blend-screen pointer-events-none" />
-
-      <div className="relative z-10 max-w-7xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="mb-8"
-        >
-          <Button
-            variant="ghost"
-            onClick={() => router.push("/")}
-            className="hover:bg-white/10 hover:text-primary group text-muted-foreground rounded-xl"
+    <main className="min-h-screen">
+      <Navbar />
+      
+      <div className="pt-28 pb-16 px-4">
+        <div className="max-w-4xl mx-auto">
+          {/* Back Button */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="mb-6"
           >
-            <ArrowLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" /> Dashboard
-          </Button>
-        </motion.div>
+            <Link href="/">
+              <Button variant="ghost" className="rounded-xl">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+            </Link>
+          </motion.div>
 
-        <div className="grid lg:grid-cols-[1fr_2fr] gap-8">
-          {/* Left Column: Info Card */}
+          {/* Header */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-bold mb-2">/{code}</h1>
+                <a 
+                  href={link.targetUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                >
+                  {link.targetUrl.length > 50 ? `${link.targetUrl.substring(0, 50)}...` : link.targetUrl}
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={copyToClipboard}
+                >
+                  {copied ? (
+                    <Check className="w-4 h-4 mr-2 text-green-500" />
+                  ) : (
+                    <Copy className="w-4 h-4 mr-2" />
+                  )}
+                  Copy Link
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-xl"
+                  onClick={() => fetchLinkData(true)}
+                  disabled={refreshing}
+                >
+                  <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+                </Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Last updated: {lastUpdate.toLocaleTimeString()}
+            </p>
+          </motion.div>
+
+          {/* Stats Cards */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="space-y-6"
+            className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
           >
-            <Card className="glass-strong border-white/10 overflow-hidden relative shadow-lg">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span className="text-4xl font-bold text-white tracking-tight drop-shadow-[0_0_10px_rgba(var(--primary),0.5)]">/{link.code}</span>
-                  <div className="p-3 bg-white/5 rounded-full border border-white/10">
-                    <Globe className="w-5 h-5 text-primary" />
+            <Card className="glass border-0">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-primary/10">
+                    <MousePointer2 className="w-5 h-5 text-primary" />
                   </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-8">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-white/60 uppercase tracking-widest ml-1">Target URL</label>
-                  <div className="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-2xl group hover:border-primary/30 transition-colors">
-                    <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                      <ExternalLink className="h-4 w-4" />
-                    </div>
-                    <span className="truncate text-sm text-white/80 flex-1">{link.targetUrl}</span>
-                    <a
-                      href={link.targetUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-muted-foreground hover:text-primary transition-colors"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
+                  <div>
+                    <p className="text-2xl font-bold">{link.totalClicks}</p>
+                    <p className="text-sm text-muted-foreground">Total Clicks</p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-5 bg-white/5 border border-white/10 rounded-2xl relative overflow-hidden group hover:border-primary/30 transition-colors">
-                    <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <div className="flex items-center gap-2 text-primary mb-2 relative z-10">
-                      <MousePointer2 className="h-4 w-4" />
-                      <span className="text-xs font-bold uppercase tracking-wider">Hits</span>
-                    </div>
-                    <p className="text-4xl font-bold text-white relative z-10 drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">{link.totalClicks}</p>
+            <Card className="glass border-0">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-green-500/10">
+                    <Globe className="w-5 h-5 text-green-500" />
                   </div>
-                  
-                  <div className="p-5 bg-white/5 border border-white/10 rounded-2xl relative overflow-hidden group hover:border-primary/30 transition-colors">
-                    <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <div className="flex items-center gap-2 text-primary mb-2 relative z-10">
-                      <Clock className="h-4 w-4" />
-                      <span className="text-xs font-bold uppercase tracking-wider">Last Active</span>
-                    </div>
-                    <p className="text-sm font-medium text-white/90 mt-1 relative z-10">
-                      {link.lastClickedAt
+                  <div>
+                    <p className="text-2xl font-bold">{uniqueIPs}</p>
+                    <p className="text-sm text-muted-foreground">Unique Visitors</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="glass border-0">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-blue-500/10">
+                    <Clock className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">
+                      {link.lastClickedAt 
                         ? new Date(link.lastClickedAt).toLocaleDateString()
-                        : "Never"}
+                        : "Never"
+                      }
                     </p>
-                    <p className="text-xs text-muted-foreground relative z-10">
-                      {link.lastClickedAt
-                        ? new Date(link.lastClickedAt).toLocaleTimeString()
-                        : "-"}
-                    </p>
+                    <p className="text-sm text-muted-foreground">Last Click</p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
 
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    onClick={copyToClipboard}
-                    className="flex-1 h-12 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-[0_0_20px_rgba(var(--primary),0.3)] hover:shadow-[0_0_30px_rgba(var(--primary),0.5)] transition-all duration-300"
-                  >
-                    <Copy className="mr-2 h-4 w-4" /> Copy Link
-                  </Button>
-                  
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="h-12 w-12 rounded-xl border-white/10 hover:bg-white/10 hover:text-primary text-white p-0"
-                      >
-                        <Share2 className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48 bg-black/80 backdrop-blur-xl border-white/10 text-white rounded-xl">
-                      <DropdownMenuItem onClick={() => shareLink('facebook')} className="cursor-pointer hover:bg-white/10 focus:bg-white/10 rounded-lg">
-                        <Facebook className="mr-2 h-4 w-4" /> Facebook
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => shareLink('whatsapp')} className="cursor-pointer hover:bg-white/10 focus:bg-white/10 rounded-lg">
-                        <Send className="mr-2 h-4 w-4" /> WhatsApp
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => shareLink('telegram')} className="cursor-pointer hover:bg-white/10 focus:bg-white/10 rounded-lg">
-                        <Send className="mr-2 h-4 w-4" /> Telegram
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => shareLink('discord')} className="cursor-pointer hover:bg-white/10 focus:bg-white/10 rounded-lg">
-                        <MessageCircle className="mr-2 h-4 w-4" /> Discord
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            <Card className="glass border-0">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-orange-500/10">
+                    <TrendingUp className="w-5 h-5 text-orange-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">
+                      {new Date(link.createdAt).toLocaleDateString()}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Created</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           </motion.div>
 
-          {/* Right Column: Analytics Chart */}
+          {/* Chart */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="h-full min-h-[400px]"
           >
-            <Card className="glass-strong border-white/10 rounded-3xl h-full flex flex-col shadow-lg">
+            <Card className="glass border-0">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-primary" />
-                  <span className="text-xl font-bold text-white tracking-tight">Traffic Analytics</span>
-                </CardTitle>
+                <CardTitle>Click Activity (Last 7 Days)</CardTitle>
               </CardHeader>
-              <CardContent className="flex-1 min-h-[300px] p-6">
-                <div className="w-full h-[300px]">
-                  {chartData.length > 0 ? (
+              <CardContent>
+                {chartData.length > 0 ? (
+                  <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData}>
-                        <defs>
-                          <linearGradient id="colorClicks" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.5}/>
-                            <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                        <XAxis
-                          dataKey="name"
-                          stroke="var(--muted-foreground)"
-                          fontSize={12}
-                          tickLine={false}
-                          axisLine={false}
-                          dy={10}
-                        />
-                        <YAxis
-                          stroke="var(--muted-foreground)"
-                          fontSize={12}
-                          tickLine={false}
-                          axisLine={false}
-                          dx={-10}
-                          allowDecimals={false}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: "rgba(0,0,0,0.8)",
-                            backdropFilter: "blur(10px)",
-                            borderColor: "rgba(255,255,255,0.1)",
-                            borderRadius: "12px",
-                            boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
-                            color: "#fff"
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                        <XAxis dataKey="date" fontSize={12} />
+                        <YAxis fontSize={12} />
+                        <Tooltip 
+                          contentStyle={{ 
+                            backgroundColor: "hsl(var(--card))",
+                            border: "none",
+                            borderRadius: "12px"
                           }}
-                          itemStyle={{ color: "var(--primary)" }}
-                          cursor={{ stroke: "var(--primary)", strokeWidth: 1, strokeDasharray: "5 5" }}
                         />
-                        <Area 
+                        <Line 
                           type="monotone" 
                           dataKey="clicks" 
-                          stroke="var(--primary)" 
-                          strokeWidth={3}
-                          fillOpacity={1} 
-                          fill="url(#colorClicks)" 
+                          stroke="hsl(var(--primary))"
+                          strokeWidth={2}
+                          dot={{ fill: "hsl(var(--primary))" }}
                         />
-                      </AreaChart>
+                      </LineChart>
                     </ResponsiveContainer>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                      <Activity className="w-12 h-12 mb-4 opacity-20" />
-                      <p>No traffic data available yet.</p>
-                      <p className="text-sm opacity-50">Share your link to start tracking.</p>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="h-64 flex items-center justify-center text-muted-foreground">
+                    No click data yet
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -334,22 +330,3 @@ export default function StatsPage() {
     </main>
   )
 }
-
-function MessageCircle(props: any) {
-    return (
-      <svg
-        {...props}
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
-      </svg>
-    )
-  }
