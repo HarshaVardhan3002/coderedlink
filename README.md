@@ -365,6 +365,50 @@ GET /:code
    - Click "Deploy"
    - Your app will be live in ~60 seconds!
 
+### Docker Deployment
+
+CodeRedLink includes full Docker support for containerized deployments.
+
+#### Prerequisites
+- [Docker](https://www.docker.com/get-started) installed
+- [Docker Compose](https://docs.docker.com/compose/install/) (included with Docker Desktop)
+
+#### Quick Start
+```bash
+# Build and run in background
+docker-compose up --build -d
+
+# View logs
+docker-compose logs -f app
+
+# Stop containers
+docker-compose down
+```
+
+#### Manual Docker Build
+```bash
+# Build image
+docker build -t coderedlink:latest .
+
+# Run container
+docker run -p 3000:3000 \
+  -e DATABASE_URL="postgresql://user:pass@host/db?sslmode=require" \
+  coderedlink:latest
+```
+
+#### Docker Configuration
+
+| File | Description |
+|------|-------------|
+| `Dockerfile` | Multi-stage build using `node:20-slim` |
+| `docker-compose.yml` | Orchestration with environment variables |
+| `.dockerignore` | Excludes node_modules, .next, .env files |
+
+#### Image Details
+- **Base**: `node:20-slim` (Debian-based for Prisma compatibility)
+- **Size**: ~500MB (includes all dependencies)
+- **Port**: 3000
+
 ### Environment Variables
 
 | Variable | Required | Description |
