@@ -1,0 +1,156 @@
+SYSTEM / CONTEXT:
+You are building a fully production-grade, feature-complete, modern full-stack application called CodeRedLink — a futuristic AR-era URL shortening platform built using Next.js (App Router) + TypeScript + Neon Postgres + Prisma + Tailwind + ShadCN UI + Framer Motion.
+
+This is not a basic CRUD toy. You must deliver a visually stunning, ultra-immersive, bleeding-edge experience that feels like living in a world where Apple Vision Pro, Meta Ray-Bans, AR/VR spatial computing, and content-responsive ambient RGB lighting are the default reality. The app should feel like liquid glass cyberpunk minimalism with extreme responsiveness, soft neon lighting, reflective UI surfaces, refraction effects, physically-based animations, magnetic UI pull forces, spring-like feedback, modern tactile motion, and immersive sound cues. A product that sucks the user in and makes them feel at home, part of the interface.
+
+DESIGN DIRECTION:
+
+Visual tone = Liquid Glass + Neon Cyberpunk + Spatial UX.
+
+Apple Liquid UI style UI glass components with blur, reflection, bloom, chromatic lighting gradients.
+
+Lighting must react to motion, input focus, and navigation actions.
+
+Use RGB-accented ambient glows and physics-based UI transitions.
+
+Use Framer Motion for buttery smooth spring-based animations.
+
+Use real-time atmospheric lighting tied to element colors.
+
+Use bold high-contrast typography.
+
+Buttons feel physical, magnetic, and glass-like with depth.
+
+The experience should feel like it belongs inside Vision Pro’s floating windows with reflections and depth parallax.
+
+Responsive design that scales from phone → laptop → AR spatial layout.
+
+No boring flat bootstrap-tier layouts. This is power.
+
+CORE FEATURES (MUST implement exactly)
+Backend/API Requirements
+
+API Endpoints:
+
+Method	Route	Purpose
+POST	/api/links	Create link (long URL + optional custom code)
+GET	/api/links	List all links
+GET	/api/links/:code	Stats for specific link
+DELETE	/api/links/:code	Soft delete a link
+GET	/healthz	Health check JSON
+Redirect Route
+
+GET /:code →
+
+Look up code
+
+If not found: 404 page
+
+If found: increment totalClicks, update lastClickedAt, return 302 redirect to targetUrl
+
+URL Shortening Rules
+
+Codes must match [A-Za-z0-9]{6,8}
+
+Custom code optional but must not collide → return 409 conflict if exists
+
+URL validation required
+
+DB Schema (Prisma)
+model Link {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  targetUrl     String
+  totalClicks   Int      @default(0)
+  lastClickedAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+}
+
+Pages
+Route	Content
+/	Dashboard with link form + table
+/code/[code]	Stats page
+/:code	Redirect
+/healthz	System status JSON
+Dashboard UX
+
+Animated glass floating panels
+
+Neon-accented hover states
+
+Search & filter functionality
+
+Inline validation
+
+Copy button for short URLs
+
+Delete with modal + motion exit animation
+
+Table with shortened scrollable view
+
+Stats page UX
+
+Full analytics display with motion charts
+
+Bounce-in layout animations
+
+Timeline click graph (optional)
+
+TECH STACK
+
+Next.js (App Router) + TypeScript
+
+Tailwind CSS + ShadCN UI
+
+Framer Motion
+
+Prisma ORM
+
+Neon Postgres
+
+react-hook-form + Zod
+
+Live deployed on Vercel
+
+NON-NEGOTIABLE EXPECTATIONS
+
+Performance optimized
+
+Smooth GPU-accelerated animations
+
+Clean architecture, organized file structure
+
+Error, loading & empty states included
+
+Perfect responsiveness
+
+Ready for real world demo
+
+Automatic Git deploy → Vercel build → running app
+
+.env.example included with correct variables
+
+STARTER PROMPT (use after context to make agent start coding)
+
+STARTER TASK PROMPT:
+Build the full CodeRedLink application end-to-end using the requirements above.
+Use the provided DATABASE_URL environment variable to connect Prisma to Neon Postgres.
+Initialize the Prisma schema, run migrations automatically, generate API endpoints, create the full UI, implement AR-era immersive animated design, and deploy the finished app to Vercel.
+Ensure the UX reflects spatial computing / liquid glass / neon cyber-aesthetic with rich motion and ambient lighting.
+After generating the full stack, run auto-tests with all endpoints and deliver a working deployed URL.
+
+Begin by:
+
+Installing dependencies
+
+Setting up Prisma and DB models
+
+Creating all API routes
+
+Building animated UI
+
+Deploying to Vercel
+
+Returning full repo code
